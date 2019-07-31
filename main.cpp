@@ -64,15 +64,33 @@ void setup()
     config.acc_BufferLength = 512;
     config.acc_MaxNumSources = 16;
 
-    // ovrAudioContext context;
+    ovrAudioContext context1;
 
-    if ( ovrAudio_CreateContext( &context, &config ) != ovrSuccess )
+    if ( ovrAudio_CreateContext( &context1, &config ) != ovrSuccess )
     {
       printf( "WARNING: Could not create context!\n" );
       return;
     }
+
+    context = context1;
 }
 
+
+void writeMixBuffer(float * buffer){
+
+    vector<vector<double>> final;
+
+    cout << "buffer addr: " << buffer << endl;
+
+    final.resize(1);
+    final[0].resize(INPUT_BUFFER_SIZE);
+
+    for (int i = 0; i < INPUT_BUFFER_SIZE; i ++){
+        final[0][i] = buffer[i];
+    }
+
+    audioFile.save("results/front.wav");
+}
 
 // \subsection spatialization Applying 3D Spatialization
 
@@ -90,6 +108,9 @@ void processSounds( Sound *sounds, int NumSounds, float *MixBuffer )
 
    float outbuffer[ INPUT_BUFFER_SIZE * 2 ];
    float inbuffer[ INPUT_BUFFER_SIZE ];
+
+    float * mixBuffer = MixBuffer;
+
 
    for ( int i = 0; i < NumSounds; i++ )
    {
@@ -109,6 +130,8 @@ void processSounds( Sound *sounds, int NumSounds, float *MixBuffer )
       // as necessary.  This is application specific code.
       sounds[ i ].GetSoundData( inbuffer );
 
+        cout << "MixBuffer1 addr4: " << MixBuffer << endl;
+
       // Spatialize the sound into the output buffer.  Note that there
       // are two APIs, one for interleaved sample data and another for
       // separate left/right sample data
@@ -117,30 +140,35 @@ void processSounds( Sound *sounds, int NumSounds, float *MixBuffer )
           i, 
          Flags, &Status,
          outbuffer, inbuffer );
+        cout << "MixBuffer addr5: " << MixBuffer << endl;
+        cout << "mixBuffer  addr5: " << mixBuffer << endl;
 
       // Do some mixing      
-      for ( int j = 0; j < INPUT_BUFFER_SIZE; j++ )
-      {
-         if ( i == 0 )
-         {
-            MixBuffer[ j ] = outbuffer[ j ];
-         }
-         else
-         {
-            MixBuffer[ j ] += outbuffer[ j ];
-         }
-      }   
+       for ( int j = 0; j < INPUT_BUFFER_SIZE; j++ ){
+            float out = outbuffer[ j ];
+            mixBuffer[ j ] = out;
+            int x = 1;
+         // if ( i == 0 )
+         // {
+         //    MixBuffer[ j ] = outbuffer[ j ];
+         // }
+         // else
+         // {
+         //    MixBuffer[ j ] += outbuffer[ j ];
+         // }
+       }   
    }
 
    // From here we'd send the MixBuffer on for more processing or
    // final device output
 
-    
-    // PlayMixBuffer( ... );
+    writeMixBuffer(mixBuffer);    
 }
 
 int main(){
     
+
+
     audioFile.load("./samples/Chirping-Birds.wav");
 
     int sampleRate = audioFile.getSampleRate();
@@ -160,7 +188,9 @@ int main(){
 
     Sound * sound = new Sound(audioFile.samples);
 
-    float mixbuffer[INPUT_BUFFER_SIZE];
+    float * mixbuffer = new float[INPUT_BUFFER_SIZE];
+
+    cout << "mixbuffer addr: " << mixbuffer << endl;
 
     processSounds(sound, INPUT_BUFFER_SIZE, mixbuffer);
 
