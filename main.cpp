@@ -6,7 +6,7 @@
 ovrAudioContext context;
 AudioFile<double> audioFile;
 
-#define INPUT_BUFFER_SIZE 1000
+#define INPUT_BUFFER_SIZE 90000
 
 using namespace std;
 
@@ -14,7 +14,7 @@ using namespace std;
 class Sound {
     public:
 
-        int X, Y, Z;
+        float X, Y, Z;
         int RangeMin, RangeMax;
         float soundData[INPUT_BUFFER_SIZE];
 
@@ -60,7 +60,7 @@ void setup()
 
     config.acc_Size = sizeof( config );
     // config.acc_Provider = ovrAudioSpatializationProvider_OVR_OculusHQ;
-    config.acc_SampleRate = 48000;
+    config.acc_SampleRate = 44100;
     config.acc_BufferLength = 512;
     config.acc_MaxNumSources = 16;
 
@@ -89,10 +89,24 @@ void writeMixBuffer(float * buffer){
         final[0][i] = buffer[i];
     }
 
-    audioFile.save("results/front.wav");
+    audioFile.setAudioBuffer(final);
+    audioFile.save("results/mixbuffer2.wav");
 }
 
-// \subsection spatialization Applying 3D Spatialization
+
+void compareInterleaved(float * outbuffer, float * inbuffer){
+    for (int i = 0; i < INPUT_BUFFER_SIZE; i++){
+        int left = i * 2;
+        int right = left + 1;
+        
+        if (outbuffer[left] > .1){
+            cout << i << endl;
+            cout << "left: " << outbuffer[left] << endl;
+            cout << "left - right: " << outbuffer[left] - outbuffer[right] << endl;
+            cout << "left - in: " << outbuffer[left] - inbuffer[i] << endl;
+        }
+    }
+}
 
 // Applying 3D spatialiazation consists of looping over all of your sounds, 
 // copying their data into intermediate buffers, and passing them to the 
@@ -143,20 +157,22 @@ void processSounds( Sound *sounds, int NumSounds, float *MixBuffer )
         cout << "MixBuffer addr5: " << MixBuffer << endl;
         cout << "mixBuffer  addr5: " << mixBuffer << endl;
 
+       // compareInterleaved(outbuffer, inbuffer);
+
       // Do some mixing      
        for ( int j = 0; j < INPUT_BUFFER_SIZE; j++ ){
-            float out = outbuffer[ j ];
-            mixBuffer[ j ] = out;
-            int x = 1;
-         // if ( i == 0 )
-         // {
-         //    MixBuffer[ j ] = outbuffer[ j ];
-         // }
-         // else
-         // {
-         //    MixBuffer[ j ] += outbuffer[ j ];
-         // }
-       }   
+            // float out = 
+            // mixBuffer[ j ] = outbuffer[ j ];
+            // int x = 1;
+         if ( i == 0 )
+         {
+            mixBuffer[ j ] = outbuffer[ j ];
+         }
+         else
+         {
+            mixBuffer[ j ] += outbuffer[ j ];
+         }
+       }  
    }
 
    // From here we'd send the MixBuffer on for more processing or
