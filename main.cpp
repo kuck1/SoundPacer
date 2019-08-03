@@ -31,9 +31,9 @@ class Sound {
             RangeMax = 100;
         }
 
-        int GetSoundData(float * inbuffer, int idx){
+        int GetSoundData(float * inbuffer, int sound_idx){
             for(int i = 0; i < BUFFER_SIZE; i ++){
-                inbuffer[i] = soundData[(i + idx)];
+                inbuffer[i] = soundData[(i + sound_idx)];
             }
 
             return 0;
@@ -135,9 +135,16 @@ void compareInterleaved(float * outbuffer, float * inbuffer){
     }
 }
 
-void saveBuffer(float * temp, float * final, int idx){
+void saveOutBuffer(float * temp, float * final, int global_idx){
     for (int save_idx = 0; save_idx < BUFFER_SIZE * 2; save_idx++){
-        int final_idx = idx + save_idx;
+        int final_idx = global_idx * 2 + save_idx;
+        final[final_idx] = temp[save_idx];
+    }
+}
+
+void saveInBuffer(float * temp, float * final, int global_idx){
+    for (int save_idx = 0; save_idx < BUFFER_SIZE; save_idx++){
+        int final_idx = global_idx + save_idx;
         final[final_idx] = temp[save_idx];
     }
 }
@@ -147,8 +154,10 @@ void saveBuffer(float * temp, float * final, int idx){
 // positional audio engine. It will in turn process the sounds with the 
 // appropriate HRTFs and effects and return a floating point stereo buffer:
 // \code
-void processSounds( Sound *sounds, int NumSounds, float *SaveOutBuffer, float *SaveInBuffer, int idx)
+void processSounds( Sound *sounds, int NumSounds, float *SaveOutBuffer, float *SaveInBuffer, int process_idx)
 {
+    cout << "process_idx: " << process_idx << endl;
+
    // This assumes that all sounds want to be spatialized!
    // NOTE: In practice these should be 16-byte aligned, but for brevity
    // we're just showing them declared like this
@@ -156,9 +165,13 @@ void processSounds( Sound *sounds, int NumSounds, float *SaveOutBuffer, float *S
 
    float outbuffer[ BUFFER_SIZE * 2 ];
    float inbuffer[ BUFFER_SIZE ];
+   int p_idx = process_idx;
 
     float * mixBuffer1 = SaveInBuffer;
-    float * mixBuffer2 = SaveOutBuffer;
+    float * mixBuffer2 = SaveOutBuffer;    
+
+    float * inbuffer1 = inbuffer;
+    float * outbuffer1 = outbuffer;
 
     int i = 0;
     // for ( int i = 0; i < NumSounds; i++ )
@@ -178,7 +191,7 @@ void processSounds( Sound *sounds, int NumSounds, float *SaveOutBuffer, float *S
 
     // Grabs the next chunk of data from the sound, looping etc. 
     // as necessary.  This is application specific code.
-    sounds[ i ].GetSoundData( inbuffer, idx );
+    sounds[ i ].GetSoundData( inbuffer, process_idx );
 
     // Spatialize the sound into the output buffer.  Note that there
     // are two APIs, one for interleaved sample data and another for
@@ -191,7 +204,10 @@ void processSounds( Sound *sounds, int NumSounds, float *SaveOutBuffer, float *S
     SaveOutBuffer = mixBuffer2;
 
     // saveBuffer(inbuffer, SaveInBuffer, idx);
-    saveBuffer(outbuffer, SaveOutBuffer, idx);
+    cout << "process_idx: " << process_idx << endl;
+    cout << "p_idx: " << p_idx << endl;
+    saveOutBuffer(outbuffer1, SaveOutBuffer, p_idx);
+    saveInBuffer(inbuffer1, SaveInBuffer, p_idx);
 
 }
 
@@ -226,11 +242,11 @@ int main(){
     float * outBuffer = new float[INPUT_BUFFER_SIZE*2];
     float * inBuffer = new float[INPUT_BUFFER_SIZE];
 
-    for (int main_idx = 0; main_idx < INPUT_BUFFER_SIZE / BUFFER_SIZE; main_idx++){
+    for (int main_idx = 0; main_idx < (INPUT_BUFFER_SIZE / BUFFER_SIZE); main_idx++){
         processSounds(sounds, 1, outBuffer, inBuffer, main_idx*BUFFER_SIZE);
     }
 
-    // writeInBuffer(inBuffer);  
+    writeInBuffer(inBuffer);  
     writeOutBuffer(outBuffer);
 
 
