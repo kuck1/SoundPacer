@@ -169,25 +169,25 @@ int main(){
     // ResonanceAudioApiImpl * resonance_audio = new ResonanceAudioApiImpl(1, INPUT_BUFFER_SIZE, 44100);
     // resonance_audio->SetInterleavedBuffer(1, input, 1, INPUT_BUFFER_SIZE);
 
-    ResonanceAudioSystem * resonance_audio = new ResonanceAudioSystem(44100, 1, INPUT_BUFFER_SIZE);
+    ResonanceAudioSystem * resonance_audio = new ResonanceAudioSystem(44100, kNumStereoChannels, INPUT_BUFFER_SIZE);
 
-    SourceState* state;
+    SourceState * state = new SourceState();
+    
+    WorldPosition kSourcePosition(0.0f, 0.0f, 0.0f);
+    state->position = kSourcePosition;
     state->source_id = resonance_audio->api->CreateSoundObjectSource(RenderingMode::kBinauralHighQuality);
+
+    resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
 
     // Updates distance model to ensure near field effects are only applied when
     // the minimum distance is below 1m. The +1.0f here ensures that max distance
     // is greater than min distance.
-    // resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kNone, kNearFieldThreshold,
-    // kNearFieldThreshold + 1.0f);
-
-    // resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
+    resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kNone, kNearFieldThreshold,
+    kNearFieldThreshold + 1.0f);
     
-    // resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
-
-    // float * output = new float[INPUT_BUFFER_SIZE*2];
-
-    // resonance_audio->api->FillInterleavedOutputBuffer(2, INPUT_BUFFER_SIZE*2, output);
+    resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
     
+    // resonance_audio->api->FillInterleavedOutputBuffer(2, INPUT_BUFFER_SIZE*2, output);    
 
     // writeInBuffer(input);  
     // writeOutBuffer(output);
