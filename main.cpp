@@ -7,7 +7,8 @@
 
 AudioFile<double> audioFile;
 
-#define INPUT_BUFFER_SIZE 50000
+#define SOUND_SIZE 5000
+#define INPUT_BUFFER_SIZE 5000
 
 
 using namespace std;
@@ -34,11 +35,11 @@ void writeOutBuffer(float * buffer){
     cout << "buffer addr: " << buffer << endl;
 
     final.resize(2);
-    final[0].resize(INPUT_BUFFER_SIZE);
-    final[1].resize(INPUT_BUFFER_SIZE);
+    final[0].resize(SOUND_SIZE);
+    final[1].resize(SOUND_SIZE);
 
 
-    for (int i = 0; i < INPUT_BUFFER_SIZE; i ++){
+    for (int i = 0; i < SOUND_SIZE; i ++){
         int left = 2 * i;
         int right = left + 1;
 
@@ -49,7 +50,7 @@ void writeOutBuffer(float * buffer){
     audioFile.setAudioBuffer(final);
     audioFile.printSummary();
 
-    audioFile.save("results/outbuffer_new_rendered.wav");
+    audioFile.save("results/outbuffer_new_rendered111--.wav");
 }
 
 void writeInBuffer(float * buffer){
@@ -68,7 +69,7 @@ void writeInBuffer(float * buffer){
     audioFile.setAudioBuffer(final);
     audioFile.printSummary();
 
-    audioFile.save("results/inbuffer_rendered.wav");
+    audioFile.save("results/inbuffer_rendered111.wav");
 }
 
 
@@ -86,7 +87,7 @@ void compareInterleaved(float * outbuffer, float * inbuffer){
     }
 }
 
-void initSounds(float * input_float) {
+void initSounds(float * input_float, int offset) {
     audioFile.load("./samples/Chirping-Birds.wav");
 
     int sampleRate = audioFile.getSampleRate();
@@ -105,7 +106,11 @@ void initSounds(float * input_float) {
     vector<vector<double>> input = audioFile.samples;
 
     
-    for (int in_idx = 0; in_idx < INPUT_BUFFER_SIZE; in_idx++){
+    for (int in_idx = offset; in_idx < INPUT_BUFFER_SIZE + offset; in_idx++){
+        // int left = in_idx * 2;
+        // int right = left + 1;
+        // input_float[left] = (float) input[0][in_idx];
+        // input_float[right] = (float) input[1][in_idx];
         input_float[in_idx] = (float) input[0][in_idx];
     }
 }
@@ -155,14 +160,20 @@ struct SourceState {
   float near_field_gain;
 };
 
-int main(){
-    float * input = new float[INPUT_BUFFER_SIZE];
+void copyOutputToFull(float * output, float * full_output, int offset){
+     for (int out_idx = 0; out_idx < INPUT_BUFFER_SIZE; out_idx++){
+        full_output[out_idx + offset] = (float) output[out_idx];
+    }
+}
 
-    initSounds(input);
+int main(){
+    // float * input = new float[2*INPUT_BUFFER_SIZE];
+    float * input = new float[INPUT_BUFFER_SIZE];
+    float * output = new float[2* INPUT_BUFFER_SIZE];
 
     // BinauralSurroundRendererImpl * sound_renderer = new BinauralSurroundRendererImpl(INPUT_BUFFER_SIZE,44100);
     // sound_renderer->AddInterleavedInput(input, 1, INPUT_BUFFER_SIZE);
-    // sound_renderer->GetPlanarStereoOutput(&output, INPUT_BUFFER_SIZE);
+    // sound_renderer->GetInterleavedStereoOutput(&output, INPUT_BUFFER_SIZE);
     // sound_renderer->TriggerProcessing();
 
 
@@ -177,20 +188,32 @@ int main(){
     state->position = kSourcePosition;
     state->source_id = resonance_audio->api->CreateSoundObjectSource(RenderingMode::kBinauralHighQuality);
 
-    resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
+    float * full_output = new float[SOUND_SIZE * 2];
 
-    // Updates distance model to ensure near field effects are only applied when
-    // the minimum distance is below 1m. The +1.0f here ensures that max distance
-    // is greater than min distance.
-    resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kNone, kNearFieldThreshold,
-    kNearFieldThreshold + 1.0f);
-    
-    resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
-    
-    // resonance_audio->api->FillInterleavedOutputBuffer(2, INPUT_BUFFER_SIZE*2, output);    
+    for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
+        
+        cout << "main_idx -*- offset: " << main_idx << endl;
+
+        initSounds(input, main_idx);
+
+        resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
+        // resonance_audio->api->SetInterleavedBuffer(state->source_id, input, kNumStereoChannels, INPUT_BUFFER_SIZE);
+
+        // Updates distance model to ensure near field effects are only applied when
+        // the minimum distance is below 1m. The +1.0f here ensures that max distance
+        // is greater than min distance.
+        // resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kNone, kNearFieldThreshold,
+        // kNearFieldThreshold + 1.0f);
+        
+        // resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
+        
+        resonance_audio->api->FillInterleavedOutputBuffer(2, INPUT_BUFFER_SIZE, output);
+        writeOutBuffer(output);
+        // copyOutputToFull(output, full_output, main_idx);    
+    }
 
     // writeInBuffer(input);  
-    // writeOutBuffer(output);
+    // writeOutBuffer(full_output);
 
 
     return 0;
