@@ -7,7 +7,7 @@
 
 AudioFile<double> audioFile;
 
-#define SOUND_SIZE 50000
+#define SOUND_SIZE 200000
 #define INPUT_BUFFER_SIZE 5000
 
 
@@ -50,7 +50,7 @@ void writeOutBuffer(float * buffer){
     audioFile.setAudioBuffer(final);
     audioFile.printSummary();
 
-    audioFile.save("results/outbuffer_new_rendered111--z.wav");
+    audioFile.save("results/outbuffer_0_0_75.wav");
 }
 
 void writeInBuffer(float * buffer){
@@ -69,7 +69,7 @@ void writeInBuffer(float * buffer){
     audioFile.setAudioBuffer(final);
     audioFile.printSummary();
 
-    audioFile.save("results/inbuffer_rendered111.wav");
+    audioFile.save("results/inbuffer.wav");
 }
 
 
@@ -88,7 +88,7 @@ void writeInBuffer(float * buffer){
 // }
 
 void initSounds(float * input_float, int offset) {
-    audioFile.load("./samples/Chirping-Birds.wav");
+    audioFile.load("./samples/ballad_piano.wav");
 
     int sampleRate = audioFile.getSampleRate();
     int bitDepth = audioFile.getBitDepth();
@@ -191,7 +191,7 @@ int main(){
 
     SourceState * state = new SourceState();
     
-    WorldPosition kSourcePosition(0.0f, 0.0f, 0.0f);
+    WorldPosition kSourcePosition(75.0f, 0.0f, 0.0f);
     state->position = kSourcePosition;
     state->source_id = resonance_audio->api->CreateSoundObjectSource(RenderingMode::kBinauralHighQuality);
 
@@ -200,9 +200,9 @@ int main(){
 
     for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
         
-        cout << "main_idx -*- offset: " << main_idx << endl;
+        cout << "main_idx -**- offset: " << main_idx << endl;
 
-        initSounds(input, main_idx + 5000);
+        initSounds(input, main_idx);
 
         resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
         // resonance_audio->api->SetInterleavedBuffer(state->source_id, input, kNumStereoChannels, INPUT_BUFFER_SIZE);
@@ -210,8 +210,8 @@ int main(){
         // Updates distance model to ensure near field effects are only applied when
         // the minimum distance is below 1m. The +1.0f here ensures that max distance
         // is greater than min distance.
-        resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kLinear, kNearFieldThreshold,
-        kNearFieldThreshold + 1.0f);
+        resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kLinear, 10,
+        100);
         
         resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
         
