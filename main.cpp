@@ -7,7 +7,7 @@
 
 AudioFile<double> audioFile;
 
-#define SOUND_SIZE 5000
+#define SOUND_SIZE 50000
 #define INPUT_BUFFER_SIZE 5000
 
 
@@ -50,7 +50,7 @@ void writeOutBuffer(float * buffer){
     audioFile.setAudioBuffer(final);
     audioFile.printSummary();
 
-    audioFile.save("results/outbuffer_new_rendered111--.wav");
+    audioFile.save("results/outbuffer_new_rendered111--z.wav");
 }
 
 void writeInBuffer(float * buffer){
@@ -60,9 +60,9 @@ void writeInBuffer(float * buffer){
     cout << "buffer addr: " << buffer << endl;
 
     final.resize(1);
-    final[0].resize(INPUT_BUFFER_SIZE);
+    final[0].resize(SOUND_SIZE);
 
-    for (int i = 0; i < INPUT_BUFFER_SIZE; i ++){
+    for (int i = 0; i < SOUND_SIZE; i ++){
         final[0][i] = buffer[i];
     }
 
@@ -73,19 +73,19 @@ void writeInBuffer(float * buffer){
 }
 
 
-void compareInterleaved(float * outbuffer, float * inbuffer){
-    for (int i = 0; i < INPUT_BUFFER_SIZE; i++){
-        int left = i * 2;
-        int right = left + 1;
+// void compareInterleaved(float * outbuffer, float * inbuffer){
+//     for (int i = 0; i < INPUT_BUFFER_SIZE; i++){
+//         int left = i * 2;
+//         int right = left + 1;
         
-        if (outbuffer[left] > .1){
-            cout << i << endl;
-            cout << "left: " << outbuffer[left] << endl;
-            cout << "left - right: " << outbuffer[left] - outbuffer[right] << endl;
-            cout << "left - in: " << outbuffer[left] - inbuffer[i] << endl;
-        }
-    }
-}
+//         if (outbuffer[left] > .1){
+//             cout << i << endl;
+//             cout << "left: " << outbuffer[left] << endl;
+//             cout << "left - right: " << outbuffer[left] - outbuffer[right] << endl;
+//             cout << "left - in: " << outbuffer[left] - inbuffer[i] << endl;
+//         }
+//     }
+// }
 
 void initSounds(float * input_float, int offset) {
     audioFile.load("./samples/Chirping-Birds.wav");
@@ -106,12 +106,12 @@ void initSounds(float * input_float, int offset) {
     vector<vector<double>> input = audioFile.samples;
 
     
-    for (int in_idx = offset; in_idx < INPUT_BUFFER_SIZE + offset; in_idx++){
+    for (int in_idx = 0; in_idx < INPUT_BUFFER_SIZE; in_idx++){
         // int left = in_idx * 2;
         // int right = left + 1;
         // input_float[left] = (float) input[0][in_idx];
         // input_float[right] = (float) input[1][in_idx];
-        input_float[in_idx] = (float) input[0][in_idx];
+        input_float[in_idx] = (float) input[0][in_idx + offset];
     }
 }
 
@@ -161,8 +161,15 @@ struct SourceState {
 };
 
 void copyOutputToFull(float * output, float * full_output, int offset){
-     for (int out_idx = 0; out_idx < INPUT_BUFFER_SIZE; out_idx++){
-        full_output[out_idx + offset] = (float) output[out_idx];
+     int out_offset = 2 * offset;
+     for (int out_idx = 0; out_idx < INPUT_BUFFER_SIZE * 2; out_idx++){
+        full_output[out_idx + out_offset] = (float) output[out_idx];
+    }
+}
+
+void copyInputToFull(float * input, float * full_input, int offset){
+     for (int in_idx = 0; in_idx < INPUT_BUFFER_SIZE; in_idx++){
+        full_input[in_idx + offset] = (float) input[in_idx];
     }
 }
 
@@ -189,12 +196,13 @@ int main(){
     state->source_id = resonance_audio->api->CreateSoundObjectSource(RenderingMode::kBinauralHighQuality);
 
     float * full_output = new float[SOUND_SIZE * 2];
+    float * full_input = new float[SOUND_SIZE];
 
     for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
         
         cout << "main_idx -*- offset: " << main_idx << endl;
 
-        initSounds(input, main_idx);
+        initSounds(input, main_idx + 5000);
 
         resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
         // resonance_audio->api->SetInterleavedBuffer(state->source_id, input, kNumStereoChannels, INPUT_BUFFER_SIZE);
@@ -202,18 +210,19 @@ int main(){
         // Updates distance model to ensure near field effects are only applied when
         // the minimum distance is below 1m. The +1.0f here ensures that max distance
         // is greater than min distance.
-        // resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kNone, kNearFieldThreshold,
-        // kNearFieldThreshold + 1.0f);
+        resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kLinear, kNearFieldThreshold,
+        kNearFieldThreshold + 1.0f);
         
-        // resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
+        resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
         
         resonance_audio->api->FillInterleavedOutputBuffer(2, INPUT_BUFFER_SIZE, output);
-        writeOutBuffer(output);
-        // copyOutputToFull(output, full_output, main_idx);    
+        // writeOutBuffer(output);
+        copyOutputToFull(output, full_output, main_idx);    
+        copyInputToFull(input, full_input, main_idx);    
     }
 
-    // writeInBuffer(input);  
-    // writeOutBuffer(full_output);
+    writeInBuffer(full_input);  
+    writeOutBuffer(full_output);
 
 
     return 0;
