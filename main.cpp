@@ -9,7 +9,7 @@
 AudioFile<double> audioFile;
 
 #define SOUND_SIZE 200000
-#define INPUT_BUFFER_SIZE 5000
+#define INPUT_BUFFER_SIZE 1000
 
 
 using namespace std;
@@ -272,15 +272,15 @@ void multiPointTest(WorldPosition * position, int num_intervals){
     int last_updated = 0;
 
     for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
-        if(pastNext(curr,start,end) && next_position_idx != num_intervals + 1){
-            cout << "**** updating start and end" << endl;
+        if(pastNext(curr,start,end)){
+            cout << "!!! updating start and end" << endl;
             start = end;
             end = position[next_position_idx];
             next_position_idx ++;
 
-            cout << "****end_x: " << end.x() << endl;
-            cout << "****end_y: " << end.y() << endl;
-            cout << "****end_z: " << end.z() << endl;
+            cout << "! end_x: " << end.x() << endl;
+            cout << "! end_y: " << end.y() << endl;
+            cout << "! end_z: " << end.z() << endl;
             x_inc = ((end.x() - start.x()) / (SOUND_SIZE / INPUT_BUFFER_SIZE)) * num_intervals;
             y_inc = ((end.y() - start.y()) / (SOUND_SIZE / INPUT_BUFFER_SIZE)) * num_intervals;
             z_inc = ((end.z() - start.z()) / (SOUND_SIZE / INPUT_BUFFER_SIZE)) * num_intervals;
@@ -292,9 +292,70 @@ void multiPointTest(WorldPosition * position, int num_intervals){
         float curr_y = start.y() + y_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
         float curr_z = start.z() + z_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
 
-        cout << "****curr_x: " << curr_x << endl;
+        cout << "!****curr_x: " << curr_x << endl;
         cout << "****curr_y: " << curr_y << endl;
         cout << "****curr_z: " << curr_z << endl;
+
+        curr = WorldPosition(curr_x, curr_y, curr_z);
+        state->position = curr;
+        spatialize(main_idx);
+        last_updated ++;
+        sound_position_idx += INPUT_BUFFER_SIZE;
+    }
+
+    writeInBuffer(full_input);  
+    writeOutBuffer(full_output);
+}
+
+void multiPointPausingTest(WorldPosition * position, int num_intervals){
+    spatialize_setup();
+
+    WorldPosition start, end, curr;
+
+    start = position[0];
+    end = position[1];
+
+    num_intervals = num_intervals * 2 + 1;
+
+    // num_input_sections == (SOUND_SIZE / INPUT_BUFFER_SIZE)
+    // num_input_sections / num_intervals == num_sections_per_interval
+    int sections_per_interval = (SOUND_SIZE / INPUT_BUFFER_SIZE) / num_intervals;
+    int frames_per_interval = SOUND_SIZE / num_intervals;
+    float x_inc = 0;
+    float y_inc = 0;
+    float z_inc = 0;
+
+    int next_position_idx = 2;
+    int sound_position_idx = 0;
+    int last_updated = 0;
+
+    bool pause = false;
+
+    for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
+        
+        if(main_idx >= (next_position_idx - 1) * frames_per_interval) {
+            cout << "!!! updating start and end" << endl;
+            start = end;
+            end = position[next_position_idx];
+            next_position_idx ++;
+
+            if (pause){
+                float x_inc = 0;
+                float y_inc = 0;
+                float z_inc = 0;
+            } else{
+                float x_inc = (end.x() - start.x()) / sections_per_interval;
+                float y_inc = (end.y() - start.y()) / sections_per_interval;
+                float z_inc = (end.z() - start.z()) / sections_per_interval;
+            }
+            pause = !pause;
+            sound_position_idx = 0;
+            last_updated = 0;
+        }
+
+        float curr_x = start.x() + x_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
+        float curr_y = start.y() + y_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
+        float curr_z = start.z() + z_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
 
         curr = WorldPosition(curr_x, curr_y, curr_z);
         state->position = curr;
@@ -324,6 +385,7 @@ int main(){
 
     // linearTest(linearStart, linearEnd);
     multiPointTest(positions, num_intervals);
+    multiPointPausingTest(positions, num_intervals);
 
     return 0;
 }
