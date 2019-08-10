@@ -6,14 +6,17 @@
 #import "resonance-audio/resonance_audio/graph/resonance_audio_api_impl.h"
 #import "resonance-audio/platforms/common/room_properties.h"
 
-AudioFile<double> audioFile;
-
-#define SOUND_SIZE 1800000
-#define INPUT_BUFFER_SIZE 5000
 
 
 using namespace std;
 using namespace vraudio;
+AudioFile<double> audioFile;
+vector<vector<double>> sound_input;
+
+#define SOUND_SIZE 4500000
+#define INPUT_BUFFER_SIZE 5000
+
+
 
 // Represents the current state of a sound object source.
 struct SourceState {
@@ -142,7 +145,7 @@ void writeInBuffer(float * buffer){
 //     }
 // }
 
-void initSounds(float * input_float, int offset) {
+void initSounds() {
     audioFile.load("./samples/ballad_piano.wav");
 
     int sampleRate = audioFile.getSampleRate();
@@ -158,16 +161,17 @@ void initSounds(float * input_float, int offset) {
     // or, just use this quick shortcut to print a summary to the console
     audioFile.printSummary();
 
-    vector<vector<double>> input = audioFile.samples;
+    sound_input = audioFile.samples;
+}
 
-    
+void getSounds(float * input_float, int offset) { 
     for (int in_idx = 0; in_idx < INPUT_BUFFER_SIZE; in_idx++){
         // int left = in_idx * 2;
         // int right = left + 1;
         // input_float[left] = (float) input[0][in_idx];
         // input_float[right] = (float) input[1][in_idx];
         int wrap_offset = offset % 1100000;
-        input_float[in_idx] = (float) input[0][in_idx + wrap_offset];
+        input_float[in_idx] = (float) sound_input[0][in_idx + wrap_offset];
     }
 }
 
@@ -188,7 +192,7 @@ void spatialize(int main_idx){
   
     cout << "main_idx -***- offset: " << main_idx << endl;
 
-    initSounds(input, main_idx);
+    getSounds(input, main_idx);
 
     resonance_audio->api->SetInterleavedBuffer(state->source_id, input, 1, INPUT_BUFFER_SIZE);
     // resonance_audio->api->SetInterleavedBuffer(state->source_id, input, kNumStereoChannels, INPUT_BUFFER_SIZE);
@@ -221,6 +225,8 @@ void spatialize_setup(){
 
     full_output = new float[SOUND_SIZE * 2];
     full_input = new float[SOUND_SIZE];
+
+    initSounds();
 }
 
 void linearTest(WorldPosition start, WorldPosition end, string file_name){
@@ -411,24 +417,41 @@ int main(){
     string file_name = "results/smooth_transition_test.wav";
 
     WorldPosition far_front(30.0f,-1.0f, 60.0f);
-    WorldPosition close_front(10.0f, -1.0f, 20.0f);
+    // WorldPosition far_front_up(30.0f,30.0f, 60.0f);
+    // WorldPosition far_front_right(40.0f,-1.0f, 40.0f);
+    WorldPosition far_front_up_right(40.0f,30.0f, 30.0f);
+    WorldPosition mid_front(10.0f, -1.0f, 20.0f);
+    WorldPosition close_front(30.0f, -1.0f, 20.0f);
+    WorldPosition close_front_new(1.5f, 1.0f, 1.0f);
     WorldPosition close_back_right(1.5f, -1.0f, -1.0f);
     WorldPosition close_back_mid(0.0f, -1.0f, -1.0f);
     WorldPosition close_back_left(-1.5f, -1.0f, -1.0f);
-    WorldPosition mid_back(-10.0f, -1.0f, -20.0f);
-    WorldPosition far_back(-30.0f, -1.0f, -60.0f);
+    WorldPosition close5_back_right(7.5f, -1.0f, -5.0f);
+    WorldPosition close5_back_mid(0.0f, -1.0f, -5.0f);
+    WorldPosition close5_back_left(-7.5f, -1.0f, -5.0f);
+    WorldPosition surround(0.0f, 0.0f, 0.0f);
+    WorldPosition mid_back(-30.0f, -1.0f, -20.0f);
+    WorldPosition far_back(-40.0f, -1.0f, -40.0f);
+    // WorldPosition far_back(-30.0f, -1.0f, -60.0f);
 
-    // linearTest(far_front, far_front, "results/far_front.wav");
+    // linearTest(far_front_up, far_front_up, "results/far_front_up.wav");
+    // linearTest(far_front_right, far_front_right, "results/far_front_right.wav");
+    // linearTest(far_front_up_right, far_front_up_right, "results/far_front_up_right.wav");
+    
+
     // linearTest(close_front, close_front, "results/close_front.wav");
     // linearTest(close_back_right, close_back_right, "results/close_back_right.wav");
     // linearTest(close_back_mid, close_back_mid, "results/close_back_mid.wav");
     // linearTest(close_back_left, close_back_left, "results/close_back_left.wav");
     // linearTest(mid_back, mid_back, "results/mid_back.wav");
     // linearTest(far_back, far_back, "results/far_back.wav");
-    WorldPosition positions[] = {far_front, close_front, close_back_right, close_back_mid, close_back_left, mid_back, far_back};
-    int num_intervals = 7;
+    
+    WorldPosition positions[] = {surround, close5_back_mid, close5_back_left, mid_back, far_back, mid_back, close5_back_left,
+                                 close5_back_mid, close5_back_right, close_front_new, far_front_up_right,
+                                 close_front_new, close5_back_right, close5_back_mid};
+    int num_positions = 14;
 
-    multiPointTest(positions, num_intervals, true, file_name);
+    multiPointTest(positions, num_positions, true, file_name);
 
     return 0;
 }
