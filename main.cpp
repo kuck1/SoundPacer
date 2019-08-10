@@ -8,8 +8,8 @@
 
 AudioFile<double> audioFile;
 
-#define SOUND_SIZE 200000
-#define INPUT_BUFFER_SIZE 1000
+#define SOUND_SIZE 1800000
+#define INPUT_BUFFER_SIZE 5000
 
 
 using namespace std;
@@ -83,7 +83,7 @@ float * full_output;
 
 
 
-void writeOutBuffer(float * buffer){
+void writeOutBuffer(float * buffer, string name){
 
     vector<vector<double>> final;
 
@@ -105,7 +105,7 @@ void writeOutBuffer(float * buffer){
     audioFile.setAudioBuffer(final);
     audioFile.printSummary();
 
-    audioFile.save("results/outbuffer_*.wav");
+    audioFile.save(name);
 }
 
 void writeInBuffer(float * buffer){
@@ -166,7 +166,8 @@ void initSounds(float * input_float, int offset) {
         // int right = left + 1;
         // input_float[left] = (float) input[0][in_idx];
         // input_float[right] = (float) input[1][in_idx];
-        input_float[in_idx] = (float) input[0][in_idx + offset];
+        int wrap_offset = offset % 1100000;
+        input_float[in_idx] = (float) input[0][in_idx + wrap_offset];
     }
 }
 
@@ -195,7 +196,7 @@ void spatialize(int main_idx){
     // Updates distance model to ensure near field effects are only applied when
     // the minimum distance is below 1m. The +1.0f here ensures that max distance
     // is greater than min distance.
-    resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kLinear, 10, 100);
+    resonance_audio->api->SetSourceDistanceModel(state->source_id, DistanceRolloffModel::kLinear, 10, 80);
     
     resonance_audio->api->SetSourcePosition( state->source_id, state->position.x(), state->position.y(), state->position.z());
     
@@ -222,7 +223,7 @@ void spatialize_setup(){
     full_input = new float[SOUND_SIZE];
 }
 
-void linearTest(WorldPosition start, WorldPosition end){
+void linearTest(WorldPosition start, WorldPosition end, string file_name){
     spatialize_setup();
 
     WorldPosition curr;
@@ -243,7 +244,7 @@ void linearTest(WorldPosition start, WorldPosition end){
     }
 
     writeInBuffer(full_input);  
-    writeOutBuffer(full_output);
+    writeOutBuffer(full_output, file_name);
 }
 
 bool pastNext(WorldPosition curr, WorldPosition start, WorldPosition end){
@@ -255,13 +256,38 @@ bool pastNext(WorldPosition curr, WorldPosition start, WorldPosition end){
     return false;
 }
 
-void multiPointTest(WorldPosition * position, int num_intervals){
+void multiPointTest(WorldPosition * position, int num_points, bool pause, string name){
+    
+    if(pause) {
+        int new_num_points = num_points * 2;
+        WorldPosition * newPositions = new WorldPosition[new_num_points];
+        
+        for (int i = 0; i < new_num_points; i++){
+            int old_idx = i / 2;
+            cout << "i: "<< i << endl;
+            cout << "old_idx: " << old_idx << endl;
+            newPositions[i] = position[old_idx];
+        }
+
+        position = newPositions;
+        num_points = new_num_points;
+    }
+
+    int num_intervals = num_points - 1;
+    cout << "num_intervals: " << num_intervals << endl;
+
+
+    int sections_per_interval = (SOUND_SIZE / INPUT_BUFFER_SIZE) / num_intervals;
+    int frames_per_interval = SOUND_SIZE / num_intervals;
     spatialize_setup();
 
     WorldPosition start, end, curr;
 
     start = position[0];
     end = position[1];
+
+    cout << "*start.z " << start.z() << endl;
+    cout << "*end.z " << end.z() << endl;
 
     float x_inc = ((end.x() - start.x()) / (SOUND_SIZE / INPUT_BUFFER_SIZE)) * num_intervals;
     float y_inc = ((end.y() - start.y()) / (SOUND_SIZE / INPUT_BUFFER_SIZE)) * num_intervals;
@@ -272,8 +298,8 @@ void multiPointTest(WorldPosition * position, int num_intervals){
     int last_updated = 0;
 
     for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
-        if(pastNext(curr,start,end)){
-            cout << "!!! updating start and end" << endl;
+        if(main_idx >= (next_position_idx - 1) * frames_per_interval){
+            cout << "*!!! updating start and end" << endl;
             start = end;
             end = position[next_position_idx];
             next_position_idx ++;
@@ -304,69 +330,70 @@ void multiPointTest(WorldPosition * position, int num_intervals){
     }
 
     writeInBuffer(full_input);  
-    writeOutBuffer(full_output);
+    writeOutBuffer(full_output, name);
 }
 
-void multiPointPausingTest(WorldPosition * position, int num_intervals){
-    spatialize_setup();
+// void multiPointPausingTest(WorldPosition * position, int num_intervals){
+//     spatialize_setup();
 
-    WorldPosition start, end, curr;
+//     WorldPosition start, end, curr;
 
-    start = position[0];
-    end = position[1];
+//     start = position[0];
+//     end = position[1];
 
-    num_intervals = num_intervals * 2 + 1;
+//     num_intervals = num_intervals * 2 + 1;
 
-    // num_input_sections == (SOUND_SIZE / INPUT_BUFFER_SIZE)
-    // num_input_sections / num_intervals == num_sections_per_interval
-    int sections_per_interval = (SOUND_SIZE / INPUT_BUFFER_SIZE) / num_intervals;
-    int frames_per_interval = SOUND_SIZE / num_intervals;
-    float x_inc = 0;
-    float y_inc = 0;
-    float z_inc = 0;
+//     // num_input_sections == (SOUND_SIZE / INPUT_BUFFER_SIZE)
+//     // num_input_sections / num_intervals == num_sections_per_interval
+//     int sections_per_interval = (SOUND_SIZE / INPUT_BUFFER_SIZE) / num_intervals;
+//     int frames_per_interval = SOUND_SIZE / num_intervals;
 
-    int next_position_idx = 2;
-    int sound_position_idx = 0;
-    int last_updated = 0;
+//     float x_inc = 0;
+//     float y_inc = 0;
+//     float z_inc = 0;
 
-    bool pause = false;
+//     int next_position_idx = 2;
+//     int sound_position_idx = 0;
+//     int last_updated = 0;
 
-    for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
-        
-        if(main_idx >= (next_position_idx - 1) * frames_per_interval) {
-            cout << "!!! updating start and end" << endl;
-            start = end;
-            end = position[next_position_idx];
-            next_position_idx ++;
+//     bool paused = true;
 
-            if (pause){
-                float x_inc = 0;
-                float y_inc = 0;
-                float z_inc = 0;
-            } else{
-                float x_inc = (end.x() - start.x()) / sections_per_interval;
-                float y_inc = (end.y() - start.y()) / sections_per_interval;
-                float z_inc = (end.z() - start.z()) / sections_per_interval;
-            }
-            pause = !pause;
-            sound_position_idx = 0;
-            last_updated = 0;
-        }
+//     for (int main_idx = 0; main_idx < SOUND_SIZE; main_idx += INPUT_BUFFER_SIZE){
+//         if(main_idx >= (next_position_idx - 1) * frames_per_interval) {
+//             cout << "Changing intervals" << endl;
+//             next_position_idx ++;
+//             if (paused){
+//                 cout << "unpaused" << endl;
+//                 start = end;
+//                 end = position[next_position_idx];
+//                 float x_inc = (end.x() - start.x()) / sections_per_interval;
+//                 float y_inc = (end.y() - start.y()) / sections_per_interval;
+//                 float z_inc = (end.z() - start.z()) / sections_per_interval;
+//             } else{
+//                 cout << "puased" << endl;
+//                 float x_inc = 0;
+//                 float y_inc = 0;
+//                 float z_inc = 0;
+//             }
+//             paused = !paused;
+//             sound_position_idx = 0;
+//             last_updated = 0;
+//         }
 
-        float curr_x = start.x() + x_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
-        float curr_y = start.y() + y_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
-        float curr_z = start.z() + z_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
+//         float curr_x = start.x() + x_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
+//         float curr_y = start.y() + y_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
+//         float curr_z = start.z() + z_inc * (sound_position_idx / INPUT_BUFFER_SIZE);
 
-        curr = WorldPosition(curr_x, curr_y, curr_z);
-        state->position = curr;
-        spatialize(main_idx);
-        last_updated ++;
-        sound_position_idx += INPUT_BUFFER_SIZE;
-    }
+//         curr = WorldPosition(curr_x, curr_y, curr_z);
+//         state->position = curr;
+//         spatialize(main_idx);
+//         last_updated ++;
+//         sound_position_idx += INPUT_BUFFER_SIZE;
+//     }
 
-    writeInBuffer(full_input);  
-    writeOutBuffer(full_output);
-}
+//     writeInBuffer(full_input);  
+//     writeOutBuffer(full_output);
+// }
 
 int main(){
     WorldPosition sourceStart(5.0f,-1.0f, 60.0f);
@@ -377,15 +404,31 @@ int main(){
     WorldPosition sourceMid5(-5.0f, -1.0f, -1.0f);
     WorldPosition sourceEnd(-5.0f, -1.0f, -60.0f);
 
-    WorldPosition positions[] = {sourceStart,sourceMid1,sourceMid2,sourceMid3,sourceMid4,sourceMid5,sourceEnd};
-    int num_intervals = 6;
     
     WorldPosition linearStart(1.5f, -1.0f, -1.0f);
     WorldPosition linearEnd(-1.5f, -1.0f, -1.0f);
 
-    // linearTest(linearStart, linearEnd);
-    multiPointTest(positions, num_intervals);
-    multiPointPausingTest(positions, num_intervals);
+    string file_name = "results/smooth_transition_test.wav";
+
+    WorldPosition far_front(30.0f,-1.0f, 60.0f);
+    WorldPosition close_front(10.0f, -1.0f, 20.0f);
+    WorldPosition close_back_right(1.5f, -1.0f, -1.0f);
+    WorldPosition close_back_mid(0.0f, -1.0f, -1.0f);
+    WorldPosition close_back_left(-1.5f, -1.0f, -1.0f);
+    WorldPosition mid_back(-10.0f, -1.0f, -20.0f);
+    WorldPosition far_back(-30.0f, -1.0f, -60.0f);
+
+    // linearTest(far_front, far_front, "results/far_front.wav");
+    // linearTest(close_front, close_front, "results/close_front.wav");
+    // linearTest(close_back_right, close_back_right, "results/close_back_right.wav");
+    // linearTest(close_back_mid, close_back_mid, "results/close_back_mid.wav");
+    // linearTest(close_back_left, close_back_left, "results/close_back_left.wav");
+    // linearTest(mid_back, mid_back, "results/mid_back.wav");
+    // linearTest(far_back, far_back, "results/far_back.wav");
+    WorldPosition positions[] = {far_front, close_front, close_back_right, close_back_mid, close_back_left, mid_back, far_back};
+    int num_intervals = 7;
+
+    multiPointTest(positions, num_intervals, true, file_name);
 
     return 0;
 }
